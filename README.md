@@ -21,7 +21,6 @@ Ensure you have Python 3 installed. Clone this repository and install it globall
 git clone [https://github.com/MadhushaMG/codara-mc.git](https://github.com/MadhushaMG/codara-mc.git)
 cd codara-mc
 pip install .
-
 ```
 
 
@@ -35,6 +34,7 @@ codaramac status -i "Wi-Fi"   # Windows
 sudo codaramac status -i eth0 # Linux/macOS
 Stealth Mode with Timer (The Ultimate OSINT Feature):
 Change MAC and Hostname to a random value, and revert back after 60 seconds:
+```
 
 ```bash
 codaramac random -i "Wi-Fi" --stealth -t 60
