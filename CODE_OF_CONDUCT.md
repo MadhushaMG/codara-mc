@@ -48,7 +48,7 @@ Tensions can occur between community members even when they are trying their bes
 
 When an incident does occur, it is important to report it promptly.
 
-To report a possible violation, please contact the project maintainers through the communication channels provided in this repository. All reports will be handled respectfully, confidentially, and reviewed in a timely manner.
+To report a possible violation, please contact the project maintainers at [contact@codara.lk](mailto:contact@codara.lk). All reports will be handled respectfully, confidentially, and reviewed in a timely manner.
 Project Maintainers take reports of violations seriously and will make every effort to respond in a timely manner. They will investigate all reports of code of conduct violations, reviewing messages, logs, and recordings, or interviewing witnesses and other participants. Project Maintainers will keep investigation and enforcement actions as transparent as possible while prioritizing safety and confidentiality. In order to honor these values, enforcement actions are carried out in private with the involved parties, but communicating to the whole community may be part of a mutually agreed upon resolution.
 
 
