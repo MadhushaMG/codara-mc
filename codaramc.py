@@ -49,8 +49,18 @@ def run_command(command_list, error_message, allow_fail=False):
     try:
         return subprocess.check_output(command_list, stderr=subprocess.PIPE).decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
+        stderr_text = ""
+        if e.stderr:
+            try:
+                stderr_text = e.stderr.decode('utf-8').strip()
+            except AttributeError:
+                stderr_text = str(e.stderr).strip()
+
         if not allow_fail:
-            print(f"❌ ERROR: {error_message} ({' '.join(command_list)})")
+            print(f"❌ ERROR: {error_message or 'Command failed.'}")
+            if stderr_text:
+                print(f"   stderr: {stderr_text}")
+            print(f"   command: {' '.join(command_list)}")
             sys.exit(1)
         return ""
     except FileNotFoundError:
@@ -58,6 +68,16 @@ def run_command(command_list, error_message, allow_fail=False):
             print(f"❌ ERROR: System command '{command_list[0]}' not found.")
             sys.exit(1)
         return ""
+
+
+def print_macos_restriction_notice(interface):
+    if get_os() != "Darwin":
+        return
+
+    normalized_interface = interface.lower()
+    if any(marker in normalized_interface for marker in ["wifi", "wi-fi", "airport", "en0", "en1", "en2", "awdl"]):
+        print("ℹ️  INFO: On recent macOS versions, changing the MAC address of built-in Wi-Fi interfaces is often restricted by the operating system.")
+        print("   If the change fails, try a different interface or a supported external adapter.")
 
 def get_current_mac(interface):
     os_type = get_os()
@@ -197,8 +217,9 @@ def change_mac(interface, new_mac, timer=None, stealth=False):
         run_command(["ip", "link", "set", interface, "up"], f"Failed to bring up {interface}.")
         
     elif os_type == "Darwin":
-        run_command(["sudo", "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-z"], "", allow_fail=True)
-        run_command(["sudo", "ifconfig", interface, "ether", new_mac], f"Failed to set MAC address.")
+        print_macos_restriction_notice(interface)
+        run_command(["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-z"], "", allow_fail=True)
+        run_command(["ifconfig", interface, "ether", new_mac], f"Failed to set MAC address.")
         
     elif os_type == "Windows":
         success = change_mac_windows(interface, new_mac)
@@ -229,8 +250,8 @@ def reset_to_permanent(interface):
         run_command(["macchanger", "-p", interface], "", allow_fail=True)
         print(f"✅ SUCCESS! {interface} reset to original hardware MAC.")
     elif os_type == "Darwin":
-        run_command(["sudo", "ifconfig", interface, "down"], "", allow_fail=True)
-        run_command(["sudo", "ifconfig", interface, "up"], "", allow_fail=True)
+        run_command(["ifconfig", interface, "down"], "", allow_fail=True)
+        run_command(["ifconfig", interface, "up"], "", allow_fail=True)
         print(f"✅ SUCCESS! {interface} reset to original hardware MAC.")
     elif os_type == "Windows":
         success = reset_mac_windows(interface)
