@@ -11,6 +11,8 @@ import time
 import threading
 
 
+from events import event_bus
+
 def get_os():
     return platform.system()
 
@@ -103,20 +105,34 @@ def change_hostname(new_hostname):
     elif os_type == "Windows":
         run_command(["wmic", "computersystem", "where", f"name='%computername%'", "call", "rename", f"name='{new_hostname}'"], "", allow_fail=True)
 
+from cache import MemoryLRUCache
+
+# Initialize the multi-level caching mechanism with LRU Cache
+wmi_cache = MemoryLRUCache(capacity=50)
+
 # --- Windows Specific Functions (Bulletproof WMI Method) ---
 def get_windows_registry_subkey(interface):
     """Windows වලින් කෙලින්ම අදාළ Registry Folder එක අංකය අසා දැනගැනීම"""
+    
+    # Check cache first
+    cached_val = wmi_cache.get(interface)
+    if cached_val is not None:
+        return cached_val
    
     output = run_command(["wmic", "nic", "where", f"NetConnectionID='{interface}'", "get", "Index", "/value"], "", allow_fail=True)
     match = re.search(r"Index=(\d+)", output)
     if match:
-        return f"{int(match.group(1)):04d}"
+        result = f"{int(match.group(1)):04d}"
+        wmi_cache.set(interface, result, ttl=300) # Cache for 5 minutes
+        return result
     
    
     cmd = ["powershell", "-NoProfile", "-Command", f"(Get-CimInstance -ClassName Win32_NetworkAdapter -Filter \"NetConnectionID='{interface}'\").DeviceID"]
     output = run_command(cmd, "", allow_fail=True)
     try:
-        return f"{int(output.strip()):04d}"
+        result = f"{int(output.strip()):04d}"
+        wmi_cache.set(interface, result, ttl=300)
+        return result
     except:
         return None
 
@@ -209,14 +225,7 @@ def change_mac(interface, new_mac, timer=None, stealth=False):
     print(f"✅ SUCCESS! {interface} new MAC sequence executed.")
 
     if timer:
-        print(f"⏳ Timer set for {timer} seconds. The MAC will revert automatically...")
-        def revert_task():
-            time.sleep(timer)
-            print(f"\n⏰ Timer expired! Reverting {interface} to original MAC...")
-            reset_to_permanent(interface)
-        
-        t = threading.Thread(target=revert_task)
-        t.start()
+        event_bus.emit('MAC_CHANGED_WITH_TIMER', interface, timer)
 
 def reset_to_permanent(interface):
     os_type = get_os()
@@ -238,7 +247,25 @@ def reset_to_permanent(interface):
             print(f"✅ SUCCESS! {interface} reset to original hardware MAC.")
 
 # --- CLI Setup ---
+def setup_event_listeners():
+    def handle_mac_revert(interface, timer):
+        print(f"⏳ Timer set for {timer} seconds. The MAC will revert automatically...")
+        def revert_task():
+            time.sleep(timer)
+            print(f"\n⏰ Timer expired! Reverting {interface} to original MAC...")
+            event_bus.emit('REQUEST_MAC_RESET', interface)
+        
+        t = threading.Thread(target=revert_task)
+        t.start()
+
+    def handle_mac_reset(interface):
+        reset_to_permanent(interface)
+
+    event_bus.on('MAC_CHANGED_WITH_TIMER', handle_mac_revert)
+    event_bus.on('REQUEST_MAC_RESET', handle_mac_reset)
+
 def main():
+    setup_event_listeners()
     print(CODARA_BANNER) 
 
     parser = argparse.ArgumentParser(description=f"{APP_NAME} | {VERSION}")
