@@ -11,6 +11,8 @@ import time
 import threading
 
 
+from events import event_bus
+
 def get_os():
     return platform.system()
 
@@ -223,14 +225,7 @@ def change_mac(interface, new_mac, timer=None, stealth=False):
     print(f"✅ SUCCESS! {interface} new MAC sequence executed.")
 
     if timer:
-        print(f"⏳ Timer set for {timer} seconds. The MAC will revert automatically...")
-        def revert_task():
-            time.sleep(timer)
-            print(f"\n⏰ Timer expired! Reverting {interface} to original MAC...")
-            reset_to_permanent(interface)
-        
-        t = threading.Thread(target=revert_task)
-        t.start()
+        event_bus.emit('MAC_CHANGED_WITH_TIMER', interface, timer)
 
 def reset_to_permanent(interface):
     os_type = get_os()
@@ -252,7 +247,25 @@ def reset_to_permanent(interface):
             print(f"✅ SUCCESS! {interface} reset to original hardware MAC.")
 
 # --- CLI Setup ---
+def setup_event_listeners():
+    def handle_mac_revert(interface, timer):
+        print(f"⏳ Timer set for {timer} seconds. The MAC will revert automatically...")
+        def revert_task():
+            time.sleep(timer)
+            print(f"\n⏰ Timer expired! Reverting {interface} to original MAC...")
+            event_bus.emit('REQUEST_MAC_RESET', interface)
+        
+        t = threading.Thread(target=revert_task)
+        t.start()
+
+    def handle_mac_reset(interface):
+        reset_to_permanent(interface)
+
+    event_bus.on('MAC_CHANGED_WITH_TIMER', handle_mac_revert)
+    event_bus.on('REQUEST_MAC_RESET', handle_mac_reset)
+
 def main():
+    setup_event_listeners()
     print(CODARA_BANNER) 
 
     parser = argparse.ArgumentParser(description=f"{APP_NAME} | {VERSION}")
